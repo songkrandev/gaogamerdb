@@ -117,15 +117,7 @@ function Login({ onLogin }) {
           </button>
         </form>
 
-        <div style={{ marginTop: 10 }}>
-          <button
-            type="button"
-            onClick={() => setShowLegacy(v => !v)}
-            className="link-button"
-          >
-            {showLegacy ? 'ซ่อนทางเลือกสำรอง' : 'หากมีปัญหา: ใช้การเข้าสู่ระบบแบบเดิม'}
-          </button>
-        </div>
+
 
         {showLegacy && (
           <form onSubmit={handleLegacyLogin} style={{ marginTop: 10 }}>
