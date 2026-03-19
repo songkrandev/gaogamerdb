@@ -1,0 +1,28 @@
+{
+  "files": {
+    "main.css": "/static/css/main.0a14c284.css",
+    "main.js": "/static/js/main.6a589119.js",
+    "static/media/bg.png": "/static/media/bg.49333292bad7b136b997.png",
+    "static/media/wheel_card.png": "/static/media/wheel_card.b52a84cb180e2c65c114.png",
+    "static/media/bus02.png": "/static/media/bus02.3b7eae19fe0bf75d3c91.png",
+    "static/media/bus04.png": "/static/media/bus04.7644377437556d0bf20f.png",
+    "static/media/bus03.png": "/static/media/bus03.9de80f935f95995e592d.png",
+    "static/media/car09.png": "/static/media/car09.c629f2aba188c0017dfe.png",
+    "static/media/bus01.png": "/static/media/bus01.ce1cde49dd863b070567.png",
+    "static/media/car04.png": "/static/media/car04.a372b948855bdad33b5b.png",
+    "static/media/car07.png": "/static/media/car07.6bafb2df21e2b121dd7c.png",
+    "static/media/car03.png": "/static/media/car03.cf7f009fd0bd682ee11f.png",
+    "static/media/car06.png": "/static/media/car06.028df6257f67d072fea6.png",
+    "static/media/car01.png": "/static/media/car01.a6966fe8c9f2c185987c.png",
+    "static/media/car05.png": "/static/media/car05.c675135bb142572fa7be.png",
+    "static/media/car08.png": "/static/media/car08.9e103752e96c96ab6821.png",
+    "static/media/car02.png": "/static/media/car02.ae316cd658b8e8fd50bf.png",
+    "index.html": "/index.html",
+    "main.0a14c284.css.map": "/static/css/main.0a14c284.css.map",
+    "main.6a589119.js.map": "/static/js/main.6a589119.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.0a14c284.css",
+    "static/js/main.6a589119.js"
+  ]
+}
