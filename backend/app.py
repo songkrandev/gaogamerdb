@@ -2,6 +2,8 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from config import config
 import os
+from utils.database import db, get_database_uri
+from models import db_models
 
 # Create Flask app
 def create_app(config_name=None):
@@ -10,6 +12,13 @@ def create_app(config_name=None):
     
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+
+    # Database config (Render: DATABASE_URL). Fallback to sqlite for local dev.
+    app.config['SQLALCHEMY_DATABASE_URI'] = get_database_uri()
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    db.init_app(app)
+    with app.app_context():
+        db.create_all()
     
     # Enable CORS for all routes and allow common headers
     CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
@@ -32,11 +41,28 @@ def create_app(config_name=None):
     app.register_blueprint(decode_routes_bp)
     app.register_blueprint(puzzle_routes_bp)
     app.register_blueprint(common_routes_bp)
+
+    @app.route('/', methods=['GET'])
+    def index():
+        return jsonify({
+            'message': 'GaoGamer backend is running',
+            'health': '/api/health',
+            'auth': '/api/auth/login',
+            'games': {
+                'catch_start': '/api/game/catch-me/start',
+                'catch_play': '/api/game/catch-me/play'
+            }
+        }), 200
     
     # Health check endpoint
     @app.route('/api/health', methods=['GET'])
     def health_check():
-        return jsonify({'status': 'healthy', 'message': 'Server is running'}), 200
+        return jsonify({
+            'status': 'healthy',
+            'message': 'Server is running',
+            'storage': 'sqlalchemy',
+            'catch_payload_mutable': True
+        }), 200
     
     # 404 handler
     @app.errorhandler(404)
@@ -50,6 +76,7 @@ def create_app(config_name=None):
     
     return app
 
+app = create_app()
+
 if __name__ == '__main__':
-    app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host=app.config.get('SERVER_HOST', '0.0.0.0'), port=app.config.get('SERVER_PORT', 5000))

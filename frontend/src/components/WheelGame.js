@@ -37,8 +37,10 @@ export default function WheelGame({ onScoreUpdate, onGameEnd }) {
   const [message, setMessage] = useState('กด “จั่วเลข” หรือกดที่ไพ่ แล้วลากไปวางในช่องหลักร้อย / หลักสิบ / หลักหน่วย');
   const [roundFinished, setRoundFinished] = useState(false);
   const [sessionFinished, setSessionFinished] = useState(false);
+  const [computerRevealStage, setComputerRevealStage] = useState(0); // 0 none, 1 ones, 2 tens, 3 hundreds
   const [result, setResult] = useState(null);
   const timerRef = useRef(null);
+  const revealTimersRef = useRef([]);
   const deckRef = useRef(null);
   const computerSlotRefs = useRef({ hundreds: null, tens: null, ones: null });
   const flyResolveRef = useRef(null);
@@ -46,7 +48,6 @@ export default function WheelGame({ onScoreUpdate, onGameEnd }) {
   const [isCompAnimating, setIsCompAnimating] = useState(false);
 
   const remainingTurns = useMemo(() => TURNS_PER_ROUND - turn, [turn]);
-  const playerNumber = useMemo(() => calcNumber(playerSlots), [playerSlots]);
 
   const canDraw = !sessionFinished && !roundFinished && !isCompAnimating && playerDraw === null && remainingTurns > 0;
 
@@ -55,8 +56,14 @@ export default function WheelGame({ onScoreUpdate, onGameEnd }) {
     timerRef.current = null;
   };
 
+  const clearRevealTimers = () => {
+    for (const id of revealTimersRef.current) clearTimeout(id);
+    revealTimersRef.current = [];
+  };
+
   const resetRoundState = () => {
     clearTimer();
+    clearRevealTimers();
     if (flyResolveRef.current) flyResolveRef.current();
     flyResolveRef.current = null;
     setFlyCard(null);
@@ -67,12 +74,14 @@ export default function WheelGame({ onScoreUpdate, onGameEnd }) {
     setPlayerSlots({ hundreds: null, tens: null, ones: null });
     setComputerSlots({ hundreds: null, tens: null, ones: null });
     setRoundFinished(false);
+    setComputerRevealStage(0);
     setResult(null);
   };
 
   useEffect(() => {
     return () => {
       clearTimer();
+      clearRevealTimers();
     };
   }, []);
 
@@ -107,8 +116,11 @@ export default function WheelGame({ onScoreUpdate, onGameEnd }) {
   const finishRound = (nextPlayerSlots, nextComputerSlots) => {
     const p = calcNumber(nextPlayerSlots);
     const c = calcNumber(nextComputerSlots);
+    const revealStepMs = 500;
+    const afterRevealMs = 1200;
 
     setRoundFinished(true);
+    setComputerRevealStage(0);
 
     let winner = 'tie';
     let winDelta = 0;
@@ -131,13 +143,22 @@ export default function WheelGame({ onScoreUpdate, onGameEnd }) {
     else setMessage(`${roundLabel}: เสมอ`);
 
     clearTimer();
+    clearRevealTimers();
+
+    revealTimersRef.current = [
+      setTimeout(() => setComputerRevealStage(1), revealStepMs),
+      setTimeout(() => setComputerRevealStage(2), revealStepMs * 2),
+      setTimeout(() => setComputerRevealStage(3), revealStepMs * 3)
+    ];
+
+    const totalDelay = revealStepMs * 3 + afterRevealMs;
     const isLastRound = roundIndex + 1 >= TOTAL_ROUNDS;
     if (isLastRound) {
       setSessionFinished(true);
       timerRef.current = setTimeout(() => {
         onScoreUpdate?.(nextWins);
         onGameEnd?.();
-      }, 1100);
+      }, totalDelay);
       return;
     }
 
@@ -145,7 +166,7 @@ export default function WheelGame({ onScoreUpdate, onGameEnd }) {
       setRoundIndex(prev => prev + 1);
       resetRoundState();
       setMessage('กด “จั่วเลข” หรือกดที่ไพ่ แล้วลากไปวางในช่องหลักร้อย / หลักสิบ / หลักหน่วย');
-    }, 1100);
+    }, totalDelay);
   };
 
   const placeForPlayer = async (slotKey) => {
@@ -240,8 +261,14 @@ export default function WheelGame({ onScoreUpdate, onGameEnd }) {
           <div className="wheel-slots">
             {SLOTS.map(s => {
               const filled = computerSlots[s.key] !== null;
-              const showBack = filled && !(roundFinished || sessionFinished);
-              const showNumber = filled && (roundFinished || sessionFinished);
+              const revealNeeded =
+                s.key === 'ones' ? 1 : s.key === 'tens' ? 2 : 3;
+              const revealed = computerRevealStage >= revealNeeded;
+              const showBack = filled && (
+                (!(roundFinished || sessionFinished)) ||
+                ((roundFinished || sessionFinished) && !revealed)
+              );
+              const showNumber = filled && (roundFinished || sessionFinished) && revealed;
 
               return (
                 <div key={s.key} className="wheel-slot">

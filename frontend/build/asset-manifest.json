@@ -1,7 +1,7 @@
 {
   "files": {
-    "main.css": "/static/css/main.52846451.css",
-    "main.js": "/static/js/main.ab937578.js",
+    "main.css": "/static/css/main.9190e4ae.css",
+    "main.js": "/static/js/main.288196c3.js",
     "static/media/bg.png": "/static/media/bg.49333292bad7b136b997.png",
     "static/media/wheel_card.png": "/static/media/wheel_card.b52a84cb180e2c65c114.png",
     "static/media/bus02.png": "/static/media/bus02.3b7eae19fe0bf75d3c91.png",
@@ -20,7 +20,7 @@
     "index.html": "/index.html"
   },
   "entrypoints": [
-    "static/css/main.52846451.css",
-    "static/js/main.ab937578.js"
+    "static/css/main.9190e4ae.css",
+    "static/js/main.288196c3.js"
   ]
 }

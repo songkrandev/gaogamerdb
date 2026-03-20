@@ -17,6 +17,9 @@ class Config:
     GAME_SESSIONS_FILE = os.path.join(DATA_DIR, 'game_sessions.json')
     GAME_SCORES_FILE = os.path.join(DATA_DIR, 'game_scores.json')
 
+    SERVER_HOST = os.environ.get('GAOGAMER_HOST') or '0.0.0.0'
+    SERVER_PORT = int(os.environ.get('GAOGAMER_PORT') or '5000')
+
 class DevelopmentConfig(Config):
     """Development configuration"""
     DEBUG = True

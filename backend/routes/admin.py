@@ -3,6 +3,8 @@ from middleware.auth_middleware import token_required, admin_required
 from models.senior_user import SeniorUserModel
 from utils.auth import AuthUtils
 from datetime import datetime
+from utils.database import db
+from models.db_models import GameScore, GameSession, SeniorUser
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -30,23 +32,24 @@ def get_all_users():
 def get_all_scores():
     """Get all game scores with user names"""
     try:
-        from utils.json_db import JSONDatabase
-        from config import Config
-        
-        scores_db = JSONDatabase(Config.GAME_SCORES_FILE)
-        all_scores = scores_db.get_all('game_scores')
-        
-        # Get users to map user_id to name
-        users = SeniorUserModel.get_all()
-        user_map = {u['user_id']: u['full_name'] for u in users}
-        
-        # Enrich scores with user full names
+        rows = (
+            db.session.query(GameScore, SeniorUser.full_name)
+            .join(SeniorUser, SeniorUser.user_id == GameScore.user_id, isouter=True)
+            .order_by(GameScore.created_at.desc())
+            .all()
+        )
         enriched_scores = []
-        for score in all_scores:
-            enriched_score = score.copy()
-            user_id = score.get('user_id')
-            enriched_score['full_name'] = user_map.get(user_id, f"User {user_id}")
-            enriched_scores.append(enriched_score)
+        for sc, full_name in rows:
+            enriched_scores.append({
+                'score_id': sc.score_id,
+                'user_id': sc.user_id,
+                'session_id': sc.session_id,
+                'game_type': sc.game_type,
+                'score': sc.score,
+                'level': sc.level,
+                'created_at': sc.created_at.isoformat() if sc.created_at else None,
+                'full_name': full_name or f"User {sc.user_id}"
+            })
             
         return jsonify({
             'message': 'Scores retrieved successfully',
@@ -63,15 +66,12 @@ def get_all_scores():
 def delete_score(score_id):
     """Delete a specific game score"""
     try:
-        from utils.json_db import JSONDatabase
-        from config import Config
-        
-        scores_db = JSONDatabase(Config.GAME_SCORES_FILE)
-        
-        if scores_db.delete('game_scores', score_id, 'score_id'):
-            return jsonify({'message': 'Score deleted successfully'}), 200
-        else:
+        sc = GameScore.query.filter_by(score_id=score_id).first()
+        if not sc:
             return jsonify({'message': 'Failed to delete score or score not found'}), 404
+        db.session.delete(sc)
+        db.session.commit()
+        return jsonify({'message': 'Score deleted successfully'}), 200
             
     except Exception as e:
         return jsonify({'message': str(e)}), 500
@@ -82,26 +82,10 @@ def delete_score(score_id):
 def delete_all_scores():
     """Delete all game scores and sessions"""
     try:
-        from utils.json_db import JSONDatabase
-        from config import Config
-        
-        scores_db = JSONDatabase(Config.GAME_SCORES_FILE)
-        sessions_db = JSONDatabase(Config.GAME_SESSIONS_FILE)
-        
-        # Clear scores
-        scores_data = scores_db.read()
-        scores_data['game_scores'] = []
-        scores_result = scores_db.write(scores_data)
-        
-        # Clear sessions
-        sessions_data = sessions_db.read()
-        sessions_data['game_sessions'] = []
-        sessions_result = sessions_db.write(sessions_data)
-        
-        if scores_result and sessions_result:
-            return jsonify({'message': 'All scores and sessions deleted successfully'}), 200
-        else:
-            return jsonify({'message': 'Failed to delete all data'}), 500
+        db.session.query(GameScore).delete()
+        db.session.query(GameSession).delete()
+        db.session.commit()
+        return jsonify({'message': 'All scores and sessions deleted successfully'}), 200
             
     except Exception as e:
         return jsonify({'message': str(e)}), 500
@@ -239,40 +223,21 @@ def get_stats():
     """Get admin dashboard statistics"""
     try:
         total_users = SeniorUserModel.count()
-        
-        # Get game stats
-        from utils.json_db import JSONDatabase
-        from config import Config
-        
-        sessions_db = JSONDatabase(Config.GAME_SESSIONS_FILE)
-        scores_db = JSONDatabase(Config.GAME_SCORES_FILE)
-        
-        all_sessions = sessions_db.get_all('game_sessions')
-        all_scores = scores_db.get_all('game_scores')
-        
-        total_sessions = len(all_sessions)
-        total_scores = len(all_scores)
-        
-        avg_score = 0
-        if total_scores > 0:
-            score_values = [s.get('score', 0) for s in all_scores]
-            avg_score = sum(score_values) / len(score_values)
-        
-        # Calculate game popularity (count plays for each game type)
-        game_popularity_map = {}
-        for score in all_scores:
-            game_type = score.get('game_type', 'Unknown')
-            game_popularity_map[game_type] = game_popularity_map.get(game_type, 0) + 1
-            
-        # Convert to sorted list of dictionaries
-        game_popularity = []
-        for game_type, count in game_popularity_map.items():
-            game_popularity.append({
-                'label': game_type,
-                'value': count
-            })
-            
-        # Sort by value descending and take top 5
+
+        total_sessions = GameSession.query.count()
+        total_scores = GameScore.query.count()
+
+        avg_score = db.session.query(db.func.avg(GameScore.score)).scalar() or 0
+
+        popularity_rows = (
+            db.session.query(GameScore.game_type, db.func.count(GameScore.score_id))
+            .group_by(GameScore.game_type)
+            .all()
+        )
+        game_popularity = [
+            {'label': game_type or 'Unknown', 'value': int(count)}
+            for game_type, count in popularity_rows
+        ]
         game_popularity = sorted(game_popularity, key=lambda x: x['value'], reverse=True)[:5]
         
         return jsonify({
@@ -295,20 +260,9 @@ def get_stats():
 def get_score_summary():
     """Get usage summary, grouped by user, with optional date range filter"""
     try:
-        from utils.json_db import JSONDatabase
-        from config import Config
-        import re
-
         start = request.args.get('start')  # YYYY-MM-DD
         end = request.args.get('end')      # YYYY-MM-DD
 
-        # Load data
-        sessions_db = JSONDatabase(Config.GAME_SESSIONS_FILE)
-        scores_db = JSONDatabase(Config.GAME_SCORES_FILE)
-        all_sessions = sessions_db.get_all('game_sessions')
-        all_scores = scores_db.get_all('game_scores')
-
-        # Filter by date range if provided (inclusive)
         def parse_date_flexible(s):
             """Accept ISO (YYYY-MM-DD or full ISO), MM/DD/YYYY, DD/MM/YYYY, and Buddhist year (YYYY+543)."""
             if not s:
@@ -340,42 +294,31 @@ def get_score_summary():
             base = parse_date_flexible(end)
             end_dt = datetime(base.year, base.month, base.day, 23, 59, 59) if base else None
 
-        def in_range(dt_str):
-            dt = parse_date_flexible(dt_str)
-            if dt is None:
-                return False
-            if start_dt and dt < start_dt:
-                return False
-            if end_dt and dt > end_dt:
-                return False
-            return True
+        session_q = db.session.query(GameSession.user_id, db.func.count(GameSession.session_id)).group_by(GameSession.user_id)
+        score_q = db.session.query(GameScore.user_id, db.func.count(GameScore.score_id)).group_by(GameScore.user_id)
+        if start_dt:
+            session_q = session_q.filter(GameSession.start_time >= start_dt)
+            score_q = score_q.filter(GameScore.created_at >= start_dt)
+        if end_dt:
+            session_q = session_q.filter(GameSession.start_time <= end_dt)
+            score_q = score_q.filter(GameScore.created_at <= end_dt)
 
-        if start or end:
-            all_sessions = [s for s in all_sessions if in_range(s.get('start_time') or s.get('created_at'))]
-            all_scores = [s for s in all_scores if in_range(s.get('created_at'))]
+        sessions_map = {uid: int(cnt) for uid, cnt in session_q.all() if uid}
+        plays_map = {uid: int(cnt) for uid, cnt in score_q.all() if uid}
 
-        # Map user id to name
-        users = SeniorUserModel.get_all()
-        user_map = {u['user_id']: u['full_name'] for u in users}
+        user_rows = db.session.query(SeniorUser.user_id, SeniorUser.full_name).all()
+        user_map = {uid: name for uid, name in user_rows}
 
-        # Group by user
-        summary_map = {}
-        for ses in all_sessions:
-            uid = ses.get('user_id')
-            if not uid:
-                continue
-            if uid not in summary_map:
-                summary_map[uid] = {'user_id': uid, 'full_name': user_map.get(uid, f"User {uid}"), 'sessions': 0, 'plays': 0}
-            summary_map[uid]['sessions'] += 1
-        for sc in all_scores:
-            uid = sc.get('user_id')
-            if not uid:
-                continue
-            if uid not in summary_map:
-                summary_map[uid] = {'user_id': uid, 'full_name': user_map.get(uid, f"User {uid}"), 'sessions': 0, 'plays': 0}
-            summary_map[uid]['plays'] += 1
-
-        summary_list = sorted(summary_map.values(), key=lambda x: x['sessions'], reverse=True)
+        user_ids = set(sessions_map.keys()) | set(plays_map.keys())
+        summary_list = []
+        for uid in user_ids:
+            summary_list.append({
+                'user_id': uid,
+                'full_name': user_map.get(uid, f"User {uid}"),
+                'sessions': sessions_map.get(uid, 0),
+                'plays': plays_map.get(uid, 0)
+            })
+        summary_list = sorted(summary_list, key=lambda x: x['sessions'], reverse=True)
 
         return jsonify({
             'message': 'Summary retrieved successfully',
@@ -392,8 +335,6 @@ def get_score_summary():
 def get_user_score_details(user_id):
     """Get detailed scores for a user with optional date range filter"""
     try:
-        from utils.json_db import JSONDatabase
-        from config import Config
         def parse_date_flexible(s):
             if not s:
                 return None
@@ -411,9 +352,6 @@ def get_user_score_details(user_id):
                     continue
             return None
 
-        scores_db = JSONDatabase(Config.GAME_SCORES_FILE)
-        all_scores = scores_db.get_all('game_scores')
-
         start = request.args.get('start')  # YYYY-MM-DD
         end = request.args.get('end')      # YYYY-MM-DD
 
@@ -422,19 +360,24 @@ def get_user_score_details(user_id):
         start_dt = datetime(start_base.year, start_base.month, start_base.day, 0, 0, 0) if start_base else None
         end_dt = datetime(end_base.year, end_base.month, end_base.day, 23, 59, 59) if end_base else None
 
+        q = GameScore.query.filter_by(user_id=user_id)
+        if start_dt:
+            q = q.filter(GameScore.created_at >= start_dt)
+        if end_dt:
+            q = q.filter(GameScore.created_at <= end_dt)
+        q = q.order_by(GameScore.created_at.desc())
+
         details = []
-        for s in all_scores:
-            if s.get('user_id') != user_id:
-                continue
-            if start_dt or end_dt:
-                dt = parse_date_flexible(s.get('created_at'))
-                if not dt:
-                    continue
-                if start_dt and dt < start_dt:
-                    continue
-                if end_dt and dt > end_dt:
-                    continue
-            details.append(s)
+        for s in q.all():
+            details.append({
+                'score_id': s.score_id,
+                'user_id': s.user_id,
+                'session_id': s.session_id,
+                'game_type': s.game_type,
+                'score': s.score,
+                'level': s.level,
+                'created_at': s.created_at.isoformat() if s.created_at else None
+            })
 
         # Enrich with full name
         user = SeniorUserModel.get_by_id(user_id)
@@ -445,7 +388,7 @@ def get_user_score_details(user_id):
             'data': {
                 'user_id': user_id,
                 'full_name': full_name,
-                'scores': sorted(details, key=lambda x: x.get('created_at', ''), reverse=True)
+                'scores': details
             }
         }), 200
 

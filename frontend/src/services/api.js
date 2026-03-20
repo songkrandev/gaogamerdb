@@ -1,6 +1,24 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://songkrandev.pythonanywhere.com/api';
+const IS_LOCALHOST =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const IS_DEV = process.env.NODE_ENV === 'development' || IS_LOCALHOST;
+const DEV_HOST =
+  typeof window !== 'undefined' && window.location.hostname
+    ? window.location.hostname
+    : 'localhost';
+const DEFAULT_API_SCHEME = IS_DEV ? 'http' : 'https';
+const DEFAULT_API_HOST = IS_DEV ? DEV_HOST : 'songkrandev.pythonanywhere.com';
+const DEFAULT_API_PORT = IS_DEV ? '5000' : '';
+
+const API_SCHEME = (process.env.REACT_APP_API_SCHEME || DEFAULT_API_SCHEME).trim().replace(/:$/, '');
+const API_HOST = (process.env.REACT_APP_API_HOST || DEFAULT_API_HOST).trim();
+const API_PORT = (process.env.REACT_APP_API_PORT || DEFAULT_API_PORT).trim();
+let API_PREFIX = (process.env.REACT_APP_API_PREFIX || '/api').trim();
+if (!API_PREFIX.startsWith('/')) API_PREFIX = `/${API_PREFIX}`;
+
+export const API_BASE_URL = process.env.REACT_APP_API_URL || `${API_SCHEME}://${API_HOST}${API_PORT ? `:${API_PORT}` : ''}${API_PREFIX}`;
 
 
 const apiClient = axios.create({

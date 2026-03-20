@@ -138,16 +138,16 @@ function SeniorGameBoard({ onLogout }) {
     <div className="game-board">
       <header className="game-header">
         <div className="header-left">
-          {gameActive && (
+          <h1>GaoGamer - ฝึกสมอง</h1>
+        </div>
+        <div className="header-right">
+          {gameActive ? (
             <button onClick={handleBackToMenu} className="back-to-menu-btn">
               🏠 กลับเมนู
             </button>
+          ) : (
+            <button onClick={handleLogout} className="logout-btn">ออกจากระบบ</button>
           )}
-          {!gameActive && <h1>GaoGamer - ฝึกสมอง</h1>}
-        </div>
-        {gameActive && <h1 className="game-title-active">GaoGamer - ฝึกสมอง</h1>}
-        <div className="header-right">
-          <button onClick={handleLogout} className="logout-btn">ออกจากระบบ</button>
         </div>
       </header>
 
@@ -188,6 +188,7 @@ function SeniorGameBoard({ onLogout }) {
                 />
               ) : gameType === 'catch_game' ? (
                 <CatchGame 
+                  onScoreUpdate={setScore}
                   onGameEnd={handleEndGame}
                   onBackToMenu={handleBackToMenu}
                 />

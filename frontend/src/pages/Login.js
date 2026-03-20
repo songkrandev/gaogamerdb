@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { authAPI } from '../services/api';
+import { API_BASE_URL, authAPI } from '../services/api';
 import '../styles/Login.css';
 
 function Login({ onLogin }) {
@@ -9,7 +9,7 @@ function Login({ onLogin }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [serverOk, setServerOk] = useState(true);
-  const [showLegacy, setShowLegacy] = useState(false);
+  const [showLegacy] = useState(false);
   const [legacyRole, setLegacyRole] = useState('admin'); // 'admin' | 'senior'
   const navigate = useNavigate();
 
@@ -17,7 +17,7 @@ function Login({ onLogin }) {
   useEffect(() => {
     const ping = async () => {
       try {        
-        await fetch((process.env.REACT_APP_API_URL || 'https://songkrandev.pythonanywhere.com/api') + '/health');        
+        await fetch(API_BASE_URL + '/health');        
         setServerOk(true);
       } catch {
         setServerOk(false);

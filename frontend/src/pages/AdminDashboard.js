@@ -572,7 +572,7 @@ function AdminDashboard({ onLogout }) {
                   <span className="search-icon">🔍</span>
                   <input
                     type="text"
-                    placeholder="ค้นหาชื่อ, ID, เบอร์โทร..."
+                    placeholder="ค้นหาชื่อ, อีเมล, เบอร์โทร..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -582,7 +582,7 @@ function AdminDashboard({ onLogout }) {
                 <table className="users-table">
                   <thead>
                     <tr>
-                      <th>User ID</th>
+                      <th>ลำดับ</th>
                       <th>ชื่อ-สกุล</th>
                       <th>อีเมล</th>
                       <th>เบอร์โทร</th>
@@ -592,10 +592,10 @@ function AdminDashboard({ onLogout }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.map(user => (
+                    {filteredUsers.map((user, index) => (
                       <tr key={user.user_id}>
                         <td>
-                          <span className="user-id-badge">{user.user_id}</span>
+                          <span className="user-id-badge">{index + 1}</span>
                         </td>
                         <td>
                           <div className="user-name-cell">
